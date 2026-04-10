@@ -1,0 +1,222 @@
+#!/bin/bash
+# =============================================================================
+# bin/wdroid — CLI principal do wdroid v2
+# =============================================================================
+
+set -euo pipefail
+
+# Resolve symlink para encontrar o diretório real do projeto
+SELF="$(readlink -f "$0")"
+BASE_DIR="$(cd "$(dirname "$SELF")/.." && pwd)"
+
+# Carrega núcleo
+source "$BASE_DIR/core/config.sh"
+source "$BASE_DIR/core/logger.sh"
+source "$BASE_DIR/core/lock.sh"
+source "$BASE_DIR/core/utils.sh"
+source "$BASE_DIR/core/state.sh"
+
+_init_logger
+
+# Helper para carregar módulos on-demand
+_load_modules() {
+    for mod in "$@"; do
+        # shellcheck source=/dev/null
+        source "$BASE_DIR/modules/$mod.sh"
+    done
+}
+
+COMMAND="${1:-help}"
+shift || true
+
+# Comandos de leitura não precisam de lock exclusivo
+case "$COMMAND" in
+    status|logs|doctor|help|--help|-h|version)
+        acquire_lock_soft
+        ;;
+    *)
+        acquire_lock
+        ;;
+esac
+
+case "$COMMAND" in
+    # ── Ciclo de vida ─────────────────────────────────────────────────────────
+    start)
+        source "$BASE_DIR/commands/start.sh"
+        ;;
+    stop)
+        source "$BASE_DIR/commands/stop.sh"
+        ;;
+    restart)
+        source "$BASE_DIR/commands/stop.sh"
+        sleep 1
+        source "$BASE_DIR/commands/start.sh"
+        ;;
+
+    # ── Observabilidade ───────────────────────────────────────────────────────
+    status)
+        source "$BASE_DIR/commands/status.sh"
+        ;;
+    doctor)
+        source "$BASE_DIR/commands/doctor.sh" "$@"
+        ;;
+    logs)
+        source "$BASE_DIR/commands/logs.sh" "$@"
+        ;;
+
+    # ── Manutenção ────────────────────────────────────────────────────────────
+    fix)
+        _load_modules container session network
+        header "CORREÇÃO AUTOMÁTICA"
+        fix_network
+        if ! is_container_running; then
+            start_container
+        else
+            restart_container
+        fi
+        sleep 2
+        if ! is_session_running; then
+            start_session
+        fi
+        log "Executando diagnóstico pós-correção..."
+        source "$BASE_DIR/commands/doctor.sh"
+        ;;
+    reset)
+        source "$BASE_DIR/commands/reset.sh"
+        ;;
+
+    # ── Apps ──────────────────────────────────────────────────────────────────
+    launch)
+        _load_modules app
+        launch_app "${1:-$APP_PACKAGE}"
+        ;;
+    install-apk)
+        _load_modules app
+        install_apk "${1:-}"
+        ;;
+    apps)
+        _load_modules app
+        list_apps
+        ;;
+    adb)
+        _load_modules app
+        adb_connect
+        ;;
+    screenshot)
+        _load_modules app
+        capture_screen "${1:-}"
+        ;;
+    send-text)
+        _load_modules app
+        send_text "${1:-}"
+        ;;
+    multi-window)
+        _load_modules session
+        enable_multi_window
+        ;;
+
+    # ── Backup ────────────────────────────────────────────────────────────────
+    backup)
+        _load_modules container session backup
+        SUB="${1:-create}"
+        shift || true
+        case "$SUB" in
+            create)  backup_safe ;;
+            restore) restore_backup "${1:-}" ;;
+            list)    list_backups ;;
+            clean)   clean_backups "${1:-3}" ;;
+            *) echo "Uso: wdroid backup {create|restore|list|clean [N]}" ;;
+        esac
+        ;;
+
+    # ── Plugins ───────────────────────────────────────────────────────────────
+    plugin)
+        source "$BASE_DIR/core/plugin.sh"
+        plugin_cmd "$@"
+        ;;
+
+    # ── Instalação ────────────────────────────────────────────────────────────
+    install)
+        header "INSTALAÇÃO DO WAYDROID"
+        log "Atualizando pacotes..."
+        sudo apt update
+        sudo apt install -y curl ca-certificates iptables adb
+        log "Adicionando repositório Waydroid..."
+        curl https://repo.waydro.id | sudo bash
+        sudo apt install -y waydroid
+        read -rp "  Instalar com GAPPS (Google Play)? (y/n): " gapps
+        if [ "$gapps" = "y" ]; then
+            sudo waydroid init -s GAPPS
+        else
+            sudo waydroid init
+        fi
+        sudo usermod -aG waydroid "$USER"
+        log "Instalação concluída. Reinicie a sessão para aplicar grupos."
+        ;;
+
+    # ── Sistema ───────────────────────────────────────────────────────────────
+    autostart)
+        _load_modules container
+        enable_autostart
+        ;;
+    no-autostart)
+        _load_modules container
+        disable_autostart
+        ;;
+    version)
+        echo "wdroid v${WDROID_VERSION}"
+        ;;
+
+    # ── Help ──────────────────────────────────────────────────────────────────
+    help|--help|-h|"")
+        printf "\n${_C_BOLD}${_C_BLUE}wdroid v%s${_C_RESET} — Gerenciador Waydroid + WhatsApp para Debian\n\n" "$WDROID_VERSION"
+
+        printf "${_C_BOLD}Ciclo de vida:${_C_RESET}\n"
+        printf "  %-28s %s\n" "start"           "Inicia container + sessão + WhatsApp"
+        printf "  %-28s %s\n" "stop"            "Encerra sessão e container"
+        printf "  %-28s %s\n" "restart"         "Para e inicia novamente"
+
+        printf "\n${_C_BOLD}Observabilidade:${_C_RESET}\n"
+        printf "  %-28s %s\n" "status"          "Status completo do sistema"
+        printf "  %-28s %s\n" "doctor [--fix]"  "Diagnóstico (--fix para corrigir)"
+        printf "  %-28s %s\n" "logs [modo] [N]" "Logs: container|wdroid|all|follow"
+
+        printf "\n${_C_BOLD}Manutenção:${_C_RESET}\n"
+        printf "  %-28s %s\n" "fix"             "Correção automática de problemas"
+        printf "  %-28s %s\n" "reset"           "Reset completo (com backup automático)"
+
+        printf "\n${_C_BOLD}Apps:${_C_RESET}\n"
+        printf "  %-28s %s\n" "launch [pacote]" "Abre app (padrão: WhatsApp)"
+        printf "  %-28s %s\n" "install-apk <f>" "Instala APK"
+        printf "  %-28s %s\n" "apps"            "Lista apps instalados"
+        printf "  %-28s %s\n" "adb"             "Conecta ADB"
+        printf "  %-28s %s\n" "send-text <msg>" "Envia texto via ADB"
+        printf "  %-28s %s\n" "screenshot [f]"  "Captura tela"
+        printf "  %-28s %s\n" "multi-window"    "Ativa modo multi-janela"
+
+        printf "\n${_C_BOLD}Backup:${_C_RESET}\n"
+        printf "  %-28s %s\n" "backup create"   "Cria backup"
+        printf "  %-28s %s\n" "backup restore"  "Restaura backup"
+        printf "  %-28s %s\n" "backup list"     "Lista backups"
+        printf "  %-28s %s\n" "backup clean [N]" "Mantém N backups (padrão: 3)"
+
+        printf "\n${_C_BOLD}Plugins:${_C_RESET}\n"
+        printf "  %-28s %s\n" "plugin list"              "Lista plugins"
+        printf "  %-28s %s\n" "plugin run <nome> [args]" "Executa plugin"
+        printf "  %-28s %s\n" "plugin install <arquivo>" "Instala plugin"
+
+        printf "\n${_C_BOLD}Sistema:${_C_RESET}\n"
+        printf "  %-28s %s\n" "install"         "Instala o Waydroid no sistema"
+        printf "  %-28s %s\n" "autostart"       "Ativa início automático no boot"
+        printf "  %-28s %s\n" "no-autostart"    "Desativa início automático"
+        printf "  %-28s %s\n" "version"         "Exibe versão"
+
+        printf "\n  ${_C_CYAN}Exemplos: wdroid start | wdroid doctor --fix | wdroid logs follow${_C_RESET}\n\n"
+        ;;
+
+    *)
+        error "Comando desconhecido: $COMMAND"
+        echo "  Execute: wdroid help"
+        exit 1
+        ;;
+esac
