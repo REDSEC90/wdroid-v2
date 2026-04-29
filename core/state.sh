@@ -10,17 +10,20 @@
 # =============================================================================
 
 get_state() {
-    if ! systemctl is-active --quiet "$WAYDROID_CONTAINER" 2>/dev/null; then
+    local _status
+    _status=$(waydroid status 2>/dev/null)
+
+    if ! echo "$_status" | grep -q "Container:.*RUNNING"; then
         echo "STOPPED"
         return
     fi
 
-    if ! waydroid status 2>/dev/null | grep -q "Session: RUNNING"; then
+    if ! echo "$_status" | grep -q "Session:.*RUNNING"; then
         echo "CONTAINER_ONLY"
         return
     fi
 
-    if waydroid shell pidof "$APP_PACKAGE" &>/dev/null; then
+    if waydroid shell pidof "$APP_PACKAGE" &>/dev/null 2>&1; then
         echo "APP_RUNNING"
         return
     fi
@@ -57,11 +60,14 @@ require_state() {
 
     case "$required" in
         CONTAINER_ONLY)
-            [ "$current" = "STOPPED" ] && die "Container não está ativo. Execute: wdroid start"
+            if [ "$current" = "STOPPED" ]; then
+                die "Container não está ativo. Execute: wdroid start"
+            fi
             ;;
         SESSION_RUNNING|APP_RUNNING)
-            [ "$current" = "STOPPED" ] || [ "$current" = "CONTAINER_ONLY" ] && \
+            if [ "$current" = "STOPPED" ] || [ "$current" = "CONTAINER_ONLY" ]; then
                 die "Sessão Android não está ativa. Execute: wdroid start"
+            fi
             ;;
     esac
 }

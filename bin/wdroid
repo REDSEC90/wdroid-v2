@@ -88,7 +88,19 @@ case "$COMMAND" in
     # ── Apps ──────────────────────────────────────────────────────────────────
     launch)
         _load_modules app
-        launch_app "${1:-$APP_PACKAGE}"
+        case "${1:-}" in
+            tiktok-lite|tiktok)
+                source "$BASE_DIR/core/plugin.sh"
+                plugin_cmd run tiktok open
+                ;;
+            whatsapp)
+                source "$BASE_DIR/core/plugin.sh"
+                plugin_cmd run whatsapp open
+                ;;
+            *)
+                launch_app "${1:-$APP_PACKAGE}"
+                ;;
+        esac
         ;;
     install-apk)
         _load_modules app
@@ -186,13 +198,15 @@ case "$COMMAND" in
         printf "  %-28s %s\n" "reset"           "Reset completo (com backup automático)"
 
         printf "\n${_C_BOLD}Apps:${_C_RESET}\n"
-        printf "  %-28s %s\n" "launch [pacote]" "Abre app (padrão: WhatsApp)"
-        printf "  %-28s %s\n" "install-apk <f>" "Instala APK"
-        printf "  %-28s %s\n" "apps"            "Lista apps instalados"
-        printf "  %-28s %s\n" "adb"             "Conecta ADB"
-        printf "  %-28s %s\n" "send-text <msg>" "Envia texto via ADB"
-        printf "  %-28s %s\n" "screenshot [f]"  "Captura tela"
-        printf "  %-28s %s\n" "multi-window"    "Ativa modo multi-janela"
+        printf "  %-28s %s\n" "launch [pacote]"    "Abre app (padrão: WhatsApp)"
+        printf "  %-28s %s\n" "launch whatsapp"    "Abre o WhatsApp"
+        printf "  %-28s %s\n" "launch tiktok-lite" "Abre o TikTok Lite"
+        printf "  %-28s %s\n" "install-apk <f>"    "Instala APK"
+        printf "  %-28s %s\n" "apps"               "Lista apps instalados"
+        printf "  %-28s %s\n" "adb"                "Conecta ADB"
+        printf "  %-28s %s\n" "send-text <msg>"    "Envia texto via ADB"
+        printf "  %-28s %s\n" "screenshot [f]"     "Captura tela"
+        printf "  %-28s %s\n" "multi-window"       "Ativa modo multi-janela"
 
         printf "\n${_C_BOLD}Backup:${_C_RESET}\n"
         printf "  %-28s %s\n" "backup create"   "Cria backup"
