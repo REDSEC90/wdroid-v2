@@ -74,7 +74,7 @@ install)
             require_state SESSION_RUNNING
             local url="${1:-}"
             if [ -n "$url" ]; then
-                sudo waydroid shell "am start -a android.intent.action.VIEW -d '$url'"
+                sudo waydroid shell -- am start -a android.intent.action.VIEW -d "$url"
             else
                 launch_app "$TIKTOK_PACKAGE"
             fi
@@ -92,8 +92,12 @@ install)
             capture_screen "${1:-}"
             ;;
 
-        adb)
-            adb_connect
+        clear-cache)
+            require_state SESSION_RUNNING
+            log "Limpando cache do TikTok Lite..."
+            sudo waydroid shell -- pm clear "$TIKTOK_PACKAGE" --cache-only 2>/dev/null || \
+            sudo waydroid shell -- pm clear "$TIKTOK_PACKAGE"
+            log "Cache limpo."
             ;;
 
         setup)
@@ -111,6 +115,7 @@ install)
             echo "    download           Baixa o APK do TikTok Lite"
             echo "    install            Instala o APK no Waydroid"
             echo "    open [url]         Abre o TikTok Lite (ou abre uma URL diretamente)"
+            echo "    clear-cache        Limpa cache e dados temporários (mantém o app)"
             echo "    send <texto>       Envia texto via ADB (app deve estar aberto)"
             echo "    screenshot [f]     Captura a tela atual"
             echo "    adb                Conecta ADB ao Waydroid"
