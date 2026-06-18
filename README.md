@@ -1,7 +1,8 @@
 # wdroid v2
 
-CLI profissional para gerenciar WhatsApp via Waydroid no Debian.
-Arquitetura modular com state machine, retry, logging estruturado e sistema de plugins.
+CLI modular para controlar e automatizar ambientes Android/Waydroid no Linux.
+
+O projeto combina controle de ciclo de vida, máquina de estados, retentativas, logs estruturados, diagnósticos, backups e sistema de plugins. Também inclui automações específicas, como integração com WhatsApp, mas a base do projeto é um runtime reutilizável para ambientes Android no Linux.
 
 ---
 
@@ -50,8 +51,8 @@ wdroid/
 ## Instalação
 
 ```bash
-git clone https://github.com/seu-usuario/wdroid
-cd wdroid
+git clone https://github.com/REDSEC90/wdroid-v2.git
+cd wdroid-v2
 make install
 ```
 
@@ -66,7 +67,7 @@ wdroid install
 ## Uso rápido
 
 ```bash
-wdroid start              # inicia tudo e abre WhatsApp
+wdroid start              # inicia o ambiente e abre o app padrão
 wdroid stop               # encerra sessão e container
 wdroid restart            # para e reinicia
 wdroid status             # status completo
@@ -82,7 +83,7 @@ wdroid fix                # corrige problemas comuns
 ### Ciclo de vida
 | Comando | Descrição |
 |---|---|
-| `wdroid start` | Inicia container + sessão + WhatsApp |
+| `wdroid start` | Inicia container, sessão e app padrão |
 | `wdroid stop` | Encerra sessão e container |
 | `wdroid restart` | Para e inicia novamente |
 
@@ -126,7 +127,7 @@ wdroid fix                # corrige problemas comuns
 
 ---
 
-## State machine
+## Máquina de estados
 
 O wdroid rastreia o estado do ambiente em 4 níveis:
 
@@ -212,7 +213,7 @@ make clean        # remove temporários
 ## Changelog
 
 ### v2.0.0
-- State machine real (STOPPED → APP_RUNNING)
+- Máquina de estados real (STOPPED → APP_RUNNING)
 - Retry com backoff em todas as operações críticas
 - Logging estruturado com arquivo de log diário
 - Lockfile com detecção de processo órfão
