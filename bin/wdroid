@@ -26,6 +26,16 @@ _load_modules() {
     done
 }
 
+# Carrega network subsystem (SDD-002) se disponível
+_load_network_subsystem() {
+    local svc_dir="$BASE_DIR/services/network"
+    [ -d "$svc_dir" ] || return 0
+    for svc in connectivity dns routes events cache health retry; do
+        # shellcheck source=/dev/null
+        [ -f "$svc_dir/$svc.sh" ] && source "$svc_dir/$svc.sh"
+    done
+}
+
 _run_command() {
     local command_file="$1"
     shift || true
@@ -69,6 +79,8 @@ _uses_soft_lock() {
 
 COMMAND="${1:-help}"
 shift || true
+
+_load_network_subsystem
 
 if _uses_soft_lock "$COMMAND" "${1:-}"; then
     acquire_lock_soft

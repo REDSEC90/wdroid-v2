@@ -77,6 +77,13 @@ _check "Interface $WAYDROID_IFACE"   check_network        fix_network
 _check "IP forwarding"               check_ip_forward     _fix_ip_forward
 _check "Rota padrão no container"    check_default_route
 
+# Network Subsystem checks (SDD-002)
+if declare -F network_is_online &>/dev/null; then
+    _check "Internet acessível"      network_is_online
+    _check "DNS funcional"           dns_is_healthy
+    _check "Gateway acessível"       route_validate_default
+fi
+
 section "Armazenamento"
 _check "Diretório Waydroid"          _check_waydroid_data_dir
 _check "Diretório de backup"         _check_backup_dir

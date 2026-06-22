@@ -51,6 +51,10 @@ else
 fi
 
 print_network_status
+# Health do subsistema de rede (v0.3+)
+if declare -F network_print_health &>/dev/null; then
+    network_print_health
+fi
 
 section "Sistema"
 if check_kvm; then
