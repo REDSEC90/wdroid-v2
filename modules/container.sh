@@ -6,7 +6,7 @@
 start_container() {
     log "Iniciando container Android..."
     retry sudo systemctl start "$WAYDROID_CONTAINER"
-    wait_for "systemctl is-active --quiet $WAYDROID_CONTAINER" "$CONTAINER_TIMEOUT" "container"
+    wait_for is_container_running "$CONTAINER_TIMEOUT" "container"
 }
 
 stop_container() {
@@ -17,7 +17,7 @@ stop_container() {
 restart_container() {
     log "Reiniciando container..."
     run sudo systemctl restart "$WAYDROID_CONTAINER"
-    wait_for "systemctl is-active --quiet $WAYDROID_CONTAINER" "$CONTAINER_TIMEOUT" "container"
+    wait_for is_container_running "$CONTAINER_TIMEOUT" "container"
 }
 
 enable_autostart() {

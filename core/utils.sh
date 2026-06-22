@@ -13,12 +13,35 @@ run_silent() {
     "$@" &>/dev/null || die "Falha ao executar: $*"
 }
 
+# Executa comandos dentro do Android. Algumas instalacoes do Waydroid exigem
+# sudo para `waydroid shell`; o fallback usa sudo nao-interativo para nao travar.
+waydroid_shell() {
+    local output status
+
+    output="$(waydroid shell "$@" 2>&1)" && {
+        [ -n "$output" ] && printf "%s\n" "$output"
+        return 0
+    }
+    status=$?
+
+    if echo "$output" | grep -qi "needs root access"; then
+        output="$(sudo -n waydroid shell "$@" 2>&1)" && {
+            [ -n "$output" ] && printf "%s\n" "$output"
+            return 0
+        }
+        status=$?
+    fi
+
+    [ -n "$output" ] && printf "%s\n" "$output" >&2
+    return "$status"
+}
+
 # Retry com backoff
 retry() {
     local n=0
     local cmd=("$@")
     until "${cmd[@]}"; do
-        ((n++))
+        ((n += 1))
         if ((n >= RETRY_MAX)); then
             die "Falhou após $n tentativas: ${cmd[*]}"
         fi
@@ -27,20 +50,20 @@ retry() {
     done
 }
 
-# Aguarda condição ser verdadeira com timeout
+# Aguarda comando/função retornar sucesso com timeout
 wait_for() {
     local condition="$1"
     local timeout="${2:-$SESSION_TIMEOUT}"
     local label="${3:-condição}"
     local elapsed=0
 
-    while ! eval "$condition" &>/dev/null; do
+    while ! "$condition" &>/dev/null; do
         if ((elapsed >= timeout)); then
             die "Timeout ($timeout s) aguardando: $label"
         fi
         printf "\r  ${_C_YELLOW}aguardando %s... (%ds)${_C_RESET}" "$label" "$elapsed"
         sleep 1
-        ((elapsed++))
+        ((elapsed += 1))
     done
     printf "\r  ${_C_GREEN}%s pronto.${_C_RESET}           \n" "$label"
 }

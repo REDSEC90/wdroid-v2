@@ -4,6 +4,8 @@
 # =============================================================================
 
 backup_safe() {
+    [ -d "$WAYDROID_DATA_DIR" ] || die "Diretório Waydroid não encontrado: $WAYDROID_DATA_DIR"
+
     local ts
     ts=$(date +%Y%m%d_%H%M%S)
     local dest="$BACKUP_DIR/$ts"
@@ -20,7 +22,10 @@ backup_safe() {
         sleep 1
     fi
 
-    sudo cp -r "$WAYDROID_DATA_DIR" "$dest/" || die "Falha no backup."
+    sudo cp -a "$WAYDROID_DATA_DIR" "$dest/" || {
+        rm -rf "$dest"
+        die "Falha no backup."
+    }
     log "Backup concluído: $dest"
 
     if $was_running; then
@@ -30,6 +35,12 @@ backup_safe() {
     fi
 
     echo "$dest"
+}
+
+_backup_payload_dir() {
+    local src="$1"
+    [ -d "$src/waydroid" ] || return 1
+    printf "%s\n" "$src/waydroid"
 }
 
 restore_backup() {
@@ -44,6 +55,9 @@ restore_backup() {
 
     [ -d "$src" ] || die "Backup não encontrado: $src"
 
+    local payload
+    payload="$(_backup_payload_dir "$src")" || die "Backup inválido: diretório waydroid ausente em $src"
+
     warn "Isso substituirá o ambiente Android atual."
     confirm "Confirmar restauração?" "yes" || { log "Cancelado."; return 0; }
 
@@ -52,8 +66,32 @@ restore_backup() {
     sleep 1
 
     log "Restaurando de: $src"
-    sudo rm -rf "$WAYDROID_DATA_DIR"
-    sudo cp -r "$src/waydroid" "$WAYDROID_DATA_DIR"
+    local restore_tmp previous
+    restore_tmp="${WAYDROID_DATA_DIR}.wdroid-restore-$$"
+    previous="${WAYDROID_DATA_DIR}.wdroid-previous-$$"
+
+    sudo rm -rf "$restore_tmp" "$previous"
+    sudo cp -a "$payload" "$restore_tmp" || {
+        sudo rm -rf "$restore_tmp"
+        die "Falha ao preparar restauração."
+    }
+
+    if [ -d "$WAYDROID_DATA_DIR" ]; then
+        sudo mv "$WAYDROID_DATA_DIR" "$previous" || {
+            sudo rm -rf "$restore_tmp"
+            die "Falha ao mover instalação atual."
+        }
+    fi
+
+    if sudo mv "$restore_tmp" "$WAYDROID_DATA_DIR"; then
+        sudo rm -rf "$previous"
+    else
+        if [ -d "$previous" ]; then
+            sudo mv "$previous" "$WAYDROID_DATA_DIR" 2>/dev/null || true
+        fi
+        sudo rm -rf "$restore_tmp"
+        die "Falha ao ativar backup restaurado."
+    fi
 
     log "Restauração concluída. Execute: wdroid start"
 }
@@ -69,10 +107,17 @@ list_backups() {
 
 clean_backups() {
     local keep="${1:-3}"
+    [[ "$keep" =~ ^[0-9]+$ ]] || die "Quantidade inválida de backups para manter: $keep"
+
+    if [ ! -d "$BACKUP_DIR" ]; then
+        notice "Nenhum backup encontrado."
+        return 0
+    fi
+
     log "Mantendo os $keep backups mais recentes..."
     local count=0
-    ls -t "$BACKUP_DIR" 2>/dev/null | while read -r entry; do
-        ((count++))
+    ls -t "$BACKUP_DIR" | while read -r entry; do
+        ((count += 1))
         if ((count > keep)); then
             rm -rf "${BACKUP_DIR:?}/$entry"
             log "Removido: $entry"

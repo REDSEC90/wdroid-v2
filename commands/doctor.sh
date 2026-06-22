@@ -5,8 +5,26 @@
 
 _load_modules container session network
 
+_doctor_usage() {
+    echo "Uso: wdroid doctor [--fix|--help]"
+}
+
 AUTO_FIX=false
-[ "${1:-}" = "--fix" ] && AUTO_FIX=true
+case "${1:-}" in
+    "")
+        ;;
+    --fix)
+        AUTO_FIX=true
+        ;;
+    help|--help|-h)
+        _doctor_usage
+        return 0
+        ;;
+    *)
+        _doctor_usage
+        return 1
+        ;;
+esac
 
 header "DIAGNÓSTICO DO SISTEMA"
 
@@ -16,45 +34,52 @@ ISSUES=()
 
 _check() {
     local label="$1"
-    local condition="$2"
-    local fix_cmd="${3:-}"
-    ((TOTAL++))
+    local check_fn="$2"
+    local fix_fn="${3:-}"
+    ((TOTAL += 1))
 
-    if eval "$condition" &>/dev/null; then
+    if "$check_fn" &>/dev/null; then
         ok "$label"
-        ((SCORE++))
+        ((SCORE += 1))
     else
         fail "$label"
         ISSUES+=("$label")
-        if $AUTO_FIX && [ -n "$fix_cmd" ]; then
-            warn "Auto-fix: $fix_cmd"
-            eval "$fix_cmd" || true
+        if $AUTO_FIX && [ -n "$fix_fn" ]; then
+            warn "Auto-fix: $label"
+            "$fix_fn" || true
         fi
     fi
 }
 
+_cmd_waydroid() { command -v waydroid; }
+_cmd_systemctl() { command -v systemctl; }
+_cmd_iptables() { command -v iptables; }
+_fix_start_container() { sudo systemctl start "$WAYDROID_CONTAINER"; }
+_fix_ip_forward() { sudo sysctl -w net.ipv4.ip_forward=1; }
+_check_waydroid_data_dir() { [ -d "$WAYDROID_DATA_DIR" ]; }
+_check_backup_dir() { [ -d "$BACKUP_DIR" ] || mkdir -p "$BACKUP_DIR"; }
+
 section "Dependências"
-_check "Waydroid instalado"          "command -v waydroid"
-_check "systemctl disponível"        "command -v systemctl"
-_check "iptables disponível"         "command -v iptables"
+_check "Waydroid instalado"          _cmd_waydroid
+_check "systemctl disponível"        _cmd_systemctl
+_check "iptables disponível"         _cmd_iptables
 
 section "Hardware & sessão"
-_check "KVM ativo"                   "check_kvm"
-_check "Wayland habilitado"          "check_wayland"
+_check "KVM ativo"                   check_kvm
+_check "Wayland habilitado"          check_wayland
 
 section "Serviços"
-_check "Container rodando"           "is_container_running" \
-    "sudo systemctl start $WAYDROID_CONTAINER"
-_check "Sessão Android ativa"        "is_session_running"
+_check "Container rodando"           is_container_running _fix_start_container
+_check "Sessão Android ativa"        is_session_running
 
 section "Rede"
-_check "Interface $WAYDROID_IFACE"   "check_network"           "fix_network"
-_check "IP forwarding"               "check_ip_forward"        "sudo sysctl -w net.ipv4.ip_forward=1"
-_check "Rota padrão no container"    "check_default_route"
+_check "Interface $WAYDROID_IFACE"   check_network        fix_network
+_check "IP forwarding"               check_ip_forward     _fix_ip_forward
+_check "Rota padrão no container"    check_default_route
 
 section "Armazenamento"
-_check "Diretório Waydroid"          "[ -d '$WAYDROID_DATA_DIR' ]"
-_check "Diretório de backup"         "[ -d '$BACKUP_DIR' ] || mkdir -p '$BACKUP_DIR'"
+_check "Diretório Waydroid"          _check_waydroid_data_dir
+_check "Diretório de backup"         _check_backup_dir
 
 # Health score
 echo ""

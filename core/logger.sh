@@ -15,14 +15,19 @@ _C_BOLD='\033[1m'
 _LOG_FILE=""
 
 _init_logger() {
-    mkdir -p "$LOG_DIR"
+    mkdir -p "$LOG_DIR" 2>/dev/null || {
+        _LOG_FILE=""
+        return 0
+    }
     _LOG_FILE="$LOG_DIR/wdroid-$(date +%Y%m%d).log"
 }
 
 _write() {
     local level="$1"
     local msg="$2"
-    printf "[%s] [%-5s] %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$level" "$msg" >> "$_LOG_FILE"
+    [ -n "$_LOG_FILE" ] || _init_logger
+    [ -n "$_LOG_FILE" ] || return 0
+    printf "[%s] [%-5s] %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$level" "$msg" >> "$_LOG_FILE" 2>/dev/null || true
 }
 
 log() {

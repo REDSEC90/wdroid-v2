@@ -24,16 +24,18 @@ wdroid/
 │   ├── session.sh          # controle da sessão Android
 │   ├── network.sh          # diagnóstico e correção de rede
 │   ├── app.sh              # apps, ADB, screenshot, send-text
-│   └── backup.sh           # backup e restauração seguros
+│   ├── backup.sh           # backup e restauração seguros
+│   └── services.sh         # Play Store/GMS e Xiaomi Cloud
 ├── commands/
-│   ├── start.sh            # inicialização com state machine
-│   ├── stop.sh             # encerramento limpo com state machine
-│   ├── status.sh           # status completo do sistema
-│   ├── doctor.sh           # diagnóstico com health score e --fix
-│   ├── reset.sh            # reset seguro com backup automático
-│   └── logs.sh             # logs: container, wdroid, all, follow
+│   ├── start.sh            # ciclo de vida
+│   ├── status.sh           # status e diagnóstico
+│   ├── app.sh              # apps, ADB e sessão gráfica
+│   ├── services.sh         # Play Store e Xiaomi Cloud
+│   ├── backup.sh           # roteamento de backup
+│   └── help.sh             # ajuda principal
 ├── plugins/
-│   └── whatsapp.sh         # plugin de automação do WhatsApp
+│   ├── whatsapp.sh         # plugin de automação do WhatsApp
+│   └── tiktok.sh           # plugin de automação do TikTok Lite
 └── Makefile
 ```
 
@@ -56,10 +58,16 @@ cd wdroid-v2
 make install
 ```
 
+O código instalado fica em `~/.local/share/wdroid`; dados do usuário ficam em
+`~/.wdroid` (`apks`, `backups`, `logs` e plugins instalados).
+
 Para instalar também o Waydroid:
 
 ```bash
 wdroid install
+wdroid install --gapps
+wdroid install --vanilla
+wdroid install --no-init
 ```
 
 ---
@@ -109,6 +117,27 @@ wdroid fix                # corrige problemas comuns
 | `wdroid screenshot [f]` | Captura tela do Android |
 | `wdroid multi-window` | Ativa modo multi-janela |
 
+### Serviços Android
+| Comando | Descrição |
+|---|---|
+| `wdroid playstore init` | Inicializa Waydroid com imagem GAPPS |
+| `wdroid playstore init --force` | Reinicializa imagens com GAPPS (faça backup antes) |
+| `wdroid playstore status` | Verifica Play Store, Play Services e Android ID |
+| `wdroid playstore certify [--open]` | Mostra o Android ID e o link oficial de certificação Google |
+| `wdroid playstore open` | Abre a Play Store |
+| `wdroid micloud status` | Verifica Xiaomi Account/Xiaomi Cloud/Mi Cloud Backup |
+| `wdroid micloud install <apk...>` | Instala APKs Xiaomi locais como apps comuns |
+| `wdroid micloud install-system <apk...>` | Instala APKs Xiaomi locais como system-app via overlayfs |
+| `wdroid micloud open` | Abre Xiaomi Cloud app ou i.mi.com |
+| `wdroid micloud web` | Abre i.mi.com no Android |
+
+> Play Store depende da imagem GAPPS do Waydroid. Xiaomi Cloud depende de APKs proprietários fornecidos pelo usuário ou do acesso web em `https://i.mi.com/`; o projeto não redistribui binários Google/Xiaomi.
+
+Guarde APKs locais fora do repositório, por exemplo em `~/.wdroid/apks/`.
+
+`wdroid install` aceita `--gapps`, `--vanilla` e `--no-init` para instalação
+não interativa.
+
 ### Backup
 | Comando | Descrição |
 |---|---|
@@ -117,6 +146,9 @@ wdroid fix                # corrige problemas comuns
 | `wdroid backup list` | Lista backups disponíveis |
 | `wdroid backup clean [N]` | Mantém N backups (padrão: 3) |
 
+Backups válidos contêm um diretório `waydroid/` no nível raiz do backup.
+A restauração valida essa estrutura antes de parar/remover a instalação atual.
+
 ### Plugins
 | Comando | Descrição |
 |---|---|
@@ -124,6 +156,18 @@ wdroid fix                # corrige problemas comuns
 | `wdroid plugin run <nome>` | Executa plugin |
 | `wdroid plugin install <f>` | Instala plugin externo |
 | `wdroid plugin remove <nome>` | Remove plugin |
+
+Plugins oficiais incluídos:
+
+```bash
+wdroid plugin run whatsapp open
+wdroid plugin run whatsapp send "mensagem"
+wdroid plugin run tiktok install ~/Downloads/tiktok-lite.apk
+wdroid plugin run tiktok download "https://exemplo.local/tiktok-lite.apk"
+```
+
+O plugin do TikTok não usa URL fixa de APK. Ele procura um APK local ou baixa
+apenas de uma URL informada explicitamente pelo usuário.
 
 ---
 
@@ -147,6 +191,15 @@ Variáveis de ambiente opcionais:
 ```bash
 export WDROID_BACKUP_DIR="$HOME/meus-backups"
 export WDROID_LOG_DIR="$HOME/.logs/wdroid"
+export WDROID_APK_DIR="$HOME/.wdroid/apks"
+export WDROID_PLUGIN_DIR="$HOME/.wdroid/plugins"
+export WAYDROID_DATA_DIR="/var/lib/waydroid"
+export WDROID_APP_PACKAGE="com.whatsapp"
+export WDROID_RETRY_MAX="5"
+export WDROID_CONTAINER_TIMEOUT="10"
+export WDROID_SESSION_TIMEOUT="15"
+export WDROID_LOCK_FILE="/tmp/wdroid.lock"
+export WDROID_STATE_FILE="/tmp/wdroid.state"
 ```
 
 Ou edite diretamente `core/config.sh`.
@@ -174,6 +227,9 @@ Instale com:
 ```bash
 wdroid plugin install meu-plugin.sh
 ```
+
+Plugins instalados pelo usuário são salvos em `~/.wdroid/plugins`; plugins
+oficiais continuam em `plugins/` dentro da instalação do wdroid.
 
 ---
 
@@ -204,7 +260,7 @@ make no-autostart # remove início automático
 
 ```bash
 make lint         # shellcheck em todos os scripts
-make test         # validação de sintaxe
+make test         # suíte completa em tests/run_tests.sh
 make clean        # remove temporários
 ```
 

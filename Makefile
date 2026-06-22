@@ -2,9 +2,11 @@
 # Makefile — wdroid v2
 # =============================================================================
 
-INSTALL_BIN   := /usr/local/bin/wdroid
-INSTALL_DIR   := $(HOME)/.wdroid
-PLUGIN_DIR    := $(HOME)/.wdroid/plugins
+PREFIX        ?= /usr/local
+INSTALL_BIN   ?= $(PREFIX)/bin/wdroid
+INSTALL_DIR   ?= $(HOME)/.local/share/wdroid
+WDROID_HOME   ?= $(HOME)/.wdroid
+PLUGIN_DIR    ?= $(WDROID_HOME)/plugins
 DESKTOP_DIR   := $(HOME)/.local/share/applications
 AUTOSTART_DIR := $(HOME)/.config/autostart
 
@@ -41,25 +43,28 @@ permissions:
 # ── Instalação ────────────────────────────────────────────────────────────────
 
 install: permissions
-	@echo "[+] Criando diretório: $(INSTALL_DIR)"
-	@mkdir -p $(INSTALL_DIR) $(PLUGIN_DIR)
+	@echo "[+] Criando diretórios..."
+	@mkdir -p "$(INSTALL_DIR)" "$(PLUGIN_DIR)" "$(WDROID_HOME)/apks" "$(WDROID_HOME)/backups" "$(WDROID_HOME)/logs"
 	@echo "[+] Copiando arquivos..."
-	@cp -r bin core modules commands plugins Makefile README.md $(INSTALL_DIR)/
-	@chmod +x $(INSTALL_DIR)/bin/wdroid
+	@rm -rf "$(INSTALL_DIR)/bin" "$(INSTALL_DIR)/core" "$(INSTALL_DIR)/modules" "$(INSTALL_DIR)/commands" "$(INSTALL_DIR)/plugins" "$(INSTALL_DIR)/docs"
+	@cp -r bin core modules commands plugins docs Makefile README.md CHANGELOG.md CONTRIBUTING.md VERSION "$(INSTALL_DIR)/"
+	@chmod +x "$(INSTALL_DIR)/bin/wdroid"
 	@echo "[+] Criando link simbólico: $(INSTALL_BIN)"
-	@sudo ln -sf $(INSTALL_DIR)/bin/wdroid $(INSTALL_BIN)
+	@sudo ln -sf "$(INSTALL_DIR)/bin/wdroid" "$(INSTALL_BIN)"
 	@echo ""
 	@echo "[✓] Instalação concluída."
 	@echo "    Use: wdroid help"
+	@echo "    Dados do usuário: $(WDROID_HOME)"
 	@echo ""
 
 uninstall:
 	@echo "[+] Removendo wdroid..."
-	@sudo rm -f $(INSTALL_BIN)
-	@rm -rf $(INSTALL_DIR)
-	@rm -f $(DESKTOP_DIR)/whatsapp-waydroid.desktop
-	@rm -f $(AUTOSTART_DIR)/wdroid.desktop
+	@sudo rm -f "$(INSTALL_BIN)"
+	@rm -rf "$(INSTALL_DIR)"
+	@rm -f "$(DESKTOP_DIR)/whatsapp-waydroid.desktop"
+	@rm -f "$(AUTOSTART_DIR)/wdroid.desktop"
 	@echo "[✓] wdroid removido."
+	@echo "    Dados preservados em: $(WDROID_HOME)"
 
 # ── Integrações ───────────────────────────────────────────────────────────────
 
@@ -103,13 +108,8 @@ lint:
 	@echo "[✓] Nenhum problema encontrado."
 
 test:
-	@echo "[+] Executando testes básicos..."
-	@bash -n bin/wdroid           && echo "  [✓] bin/wdroid: sintaxe OK"
-	@for f in core/*.sh;     do bash -n "$$f" && echo "  [✓] $$f: OK"; done
-	@for f in modules/*.sh;  do bash -n "$$f" && echo "  [✓] $$f: OK"; done
-	@for f in commands/*.sh; do bash -n "$$f" && echo "  [✓] $$f: OK"; done
-	@for f in plugins/*.sh;  do bash -n "$$f" && echo "  [✓] $$f: OK"; done
-	@echo "[✓] Todos os testes passaram."
+	@echo "[+] Executando suíte de testes..."
+	@bash tests/run_tests.sh
 
 # ── Limpeza ───────────────────────────────────────────────────────────────────
 

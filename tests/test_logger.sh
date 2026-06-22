@@ -41,10 +41,31 @@ assert_eq "die() aceita código customizado" "42" "$?"
 _out=$(_run_logger 'header "TÍTULO TESTE"')
 assert_contains "header() imprime título" "TÍTULO TESTE" "$_out"
 
+# logger funciona mesmo sem _init_logger explícito
+_out=$(bash -c "
+    export HOME=/tmp
+    WDROID_LOG_DIR=/tmp/wdroid-test-logs-noinit-$$
+    source '$BASE_DIR/core/config.sh'
+    source '$BASE_DIR/core/logger.sh'
+    log 'sem init'
+")
+assert_contains "logger inicializa sob demanda" "sem init" "$_out"
+
+# logger não aborta quando LOG_DIR não pode ser criado
+_out=$(bash -c "
+    export HOME=/tmp
+    WDROID_LOG_DIR=/dev/null
+    source '$BASE_DIR/core/config.sh'
+    source '$BASE_DIR/core/logger.sh'
+    _init_logger
+    log 'sem arquivo'
+")
+assert_contains "logger segue sem arquivo de log" "sem arquivo" "$_out"
+
 # ok/fail/notice não lançam erro
 assert_exit_ok "ok() não lança erro"     bash -c "source '$BASE_DIR/core/config.sh'; source '$BASE_DIR/core/logger.sh'; _init_logger; ok 'tudo bem'"
 assert_exit_ok "fail() não lança erro"   bash -c "source '$BASE_DIR/core/config.sh'; source '$BASE_DIR/core/logger.sh'; _init_logger; fail 'algo errado'"
 assert_exit_ok "notice() não lança erro" bash -c "source '$BASE_DIR/core/config.sh'; source '$BASE_DIR/core/logger.sh'; _init_logger; notice 'atenção'"
 
 # Limpa logs de teste
-rm -rf /tmp/wdroid-test-logs-* 2>/dev/null || true
+rm -rf /tmp/wdroid-test-logs-* /tmp/wdroid-test-logs-noinit-* 2>/dev/null || true

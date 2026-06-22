@@ -28,6 +28,19 @@ assert_eq "run() aborta em falha (exit 1)" "1" "$?"
 _out=$(_run_utils 'run_silent echo "nao deve aparecer"')
 assert_eq "run_silent() não produz output" "" "$_out"
 
+# waydroid_shell() usa caminho direto quando permitido
+_out=$(_run_utils 'waydroid() { [ "$1" = "shell" ] && echo "ok"; }; export -f waydroid; waydroid_shell pm list packages')
+assert_eq "waydroid_shell() executa shell direto" "ok" "$_out"
+
+# waydroid_shell() usa sudo -n quando Waydroid exige root
+_out=$(_run_utils '
+    waydroid() { echo "This action needs root access"; return 1; }
+    sudo() { [ "$1" = "-n" ] && [ "$2" = "waydroid" ] && [ "$3" = "shell" ] && echo "root-ok"; }
+    export -f waydroid sudo
+    waydroid_shell pm path com.android.vending
+')
+assert_eq "waydroid_shell() faz fallback para sudo não-interativo" "root-ok" "$_out"
+
 # require_cmd() passa para comando existente
 _run_utils 'require_cmd bash' &>/dev/null
 assert_eq "require_cmd() passa para bash" "0" "$?"
@@ -45,19 +58,51 @@ _run_utils 'check_kvm; true' &>/dev/null
 assert_eq "check_kvm() não lança erro" "0" "$?"
 
 # wait_for() com condição imediatamente verdadeira
-_run_utils 'wait_for "true" 5 "teste"' &>/dev/null
+_run_utils 'ready_now() { true; }; wait_for ready_now 5 "teste"' &>/dev/null
 assert_eq "wait_for() passa com condição verdadeira" "0" "$?"
 
 # wait_for() com timeout
-_run_utils 'SESSION_TIMEOUT=1; wait_for "false" 1 "teste"' &>/dev/null
+_run_utils 'never_ready() { false; }; SESSION_TIMEOUT=1; wait_for never_ready 1 "teste"' &>/dev/null
 assert_eq "wait_for() falha com timeout" "1" "$?"
 
 # retry() passa quando comando tem sucesso
 _run_utils 'retry true' &>/dev/null
 assert_eq "retry() passa com sucesso" "0" "$?"
 
+# retry() funciona sob set -e após falha inicial
+_tmp_retry="/tmp/wdroid-retry-$$"
+_out=$(_run_utils "
+    set -e
+    flaky() {
+        local n
+        n=\$(cat '$_tmp_retry' 2>/dev/null || echo 0)
+        n=\$((n + 1))
+        echo \"\$n\" > '$_tmp_retry'
+        [ \"\$n\" -ge 2 ]
+    }
+    retry flaky
+    cat '$_tmp_retry'
+")
+_out=$(printf "%s\n" "$_out" | tail -n 1)
+assert_eq "retry() não aborta sob set -e no primeiro incremento" "2" "$_out"
+
 # retry() falha após RETRY_MAX tentativas
 _run_utils 'RETRY_MAX=2; RETRY_DELAY=0; retry false' &>/dev/null
 assert_eq "retry() falha após RETRY_MAX" "1" "$?"
 
-rm -rf /tmp/wdroid-test-logs-* 2>/dev/null || true
+# wait_for() funciona sob set -e após uma espera
+_tmp_wait="/tmp/wdroid-wait-$$"
+_run_utils "
+    set -e
+    eventually_ready() {
+        local n
+        n=\$(cat $_tmp_wait 2>/dev/null || echo 0)
+        n=\$((n + 1))
+        echo \"\$n\" > $_tmp_wait
+        [ \"\$n\" -ge 2 ]
+    }
+    wait_for eventually_ready 3 teste
+" &>/dev/null
+assert_eq "wait_for() não aborta sob set -e no primeiro incremento" "0" "$?"
+
+rm -rf /tmp/wdroid-test-logs-* "$_tmp_retry" "$_tmp_wait" 2>/dev/null || true

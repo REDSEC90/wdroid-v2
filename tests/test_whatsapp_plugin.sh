@@ -33,16 +33,27 @@ assert_contains "help mostra 'send'"       "send"       "$_out"
 assert_contains "help mostra 'screenshot'" "screenshot" "$_out"
 assert_contains "help mostra 'adb'"        "adb"        "$_out"
 
+_run_whatsapp '' 'help extra' &>/dev/null
+assert_eq "help rejeita argumento extra" "1" "$?"
+
+_run_whatsapp '' 'acao-invalida' &>/dev/null
+assert_eq "ação inválida retorna erro" "1" "$?"
+
+_run_whatsapp '' 'open extra' &>/dev/null
+assert_eq "open rejeita argumento extra" "1" "$?"
+
+_run_whatsapp '' 'screenshot a.png b.png' &>/dev/null
+assert_eq "screenshot rejeita argumento extra" "1" "$?"
+
 # open requer sessão — falha quando STOPPED
 _run_whatsapp \
-    'systemctl() { return 1; }; export -f systemctl' \
+    'waydroid() { echo "Container: STOPPED"; echo "Session: STOPPED"; }; export -f waydroid' \
     'open' &>/dev/null
 assert_eq "open falha sem sessão ativa" "1" "$?"
 
 # send sem argumento falha
 _run_whatsapp \
-    'systemctl() { return 0; }; export -f systemctl
-     waydroid() { echo "Session: RUNNING"; }; export -f waydroid' \
+    'waydroid() { echo "Container: RUNNING"; echo "Session: RUNNING"; }; export -f waydroid' \
     'send' &>/dev/null
 assert_eq "send sem texto falha" "1" "$?"
 

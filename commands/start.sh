@@ -3,6 +3,23 @@
 # commands/start.sh — Inicialização com state machine
 # =============================================================================
 
+_start_usage() {
+    echo "Uso: wdroid start"
+}
+
+case "${1:-}" in
+    "")
+        ;;
+    help|--help|-h)
+        _start_usage
+        return 0
+        ;;
+    *)
+        _start_usage
+        return 1
+        ;;
+esac
+
 _load_modules container session network app
 
 header "INICIANDO WAYDROID v${WDROID_VERSION}"
@@ -30,10 +47,8 @@ case "$STATE" in
         ;;
 esac
 
-if ! check_network; then
-    warn "Rede com problema — aplicando correção automática..."
-    fix_network
-fi
+log "Verificando rede do container..."
+fix_network
 
 launch_app "$APP_PACKAGE"
 

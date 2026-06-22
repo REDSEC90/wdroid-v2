@@ -3,7 +3,32 @@
 # commands/status.sh — Status completo do sistema
 # =============================================================================
 
+_status_usage() {
+    echo "Uso: wdroid status"
+}
+
+case "${1:-}" in
+    "")
+        ;;
+    help|--help|-h)
+        _status_usage
+        return 0
+        ;;
+    *)
+        _status_usage
+        return 1
+        ;;
+esac
+
 _load_modules container session network
+
+_status_container_since() {
+    local since
+    since="$(systemctl show "$WAYDROID_CONTAINER" --property=ActiveEnterTimestamp 2>/dev/null \
+        | sed 's/ActiveEnterTimestamp=//' \
+        | sed 's/  / /g' || true)"
+    printf "%s" "${since:-tempo indisponível}"
+}
 
 header "STATUS DO WAYDROID v${WDROID_VERSION}"
 
@@ -12,8 +37,7 @@ printf "  Estado: %s\n" "$(print_state)"
 
 section "Container"
 if is_container_running; then
-    ok "Ativo ($(systemctl show waydroid-container --property=ActiveEnterTimestamp \
-        | sed 's/ActiveEnterTimestamp=//' | sed 's/  / /g'))"
+    ok "Ativo ($(_status_container_since))"
 else
     fail "Inativo"
 fi
@@ -21,7 +45,7 @@ fi
 section "Sessão Android"
 if is_session_running; then
     ok "Ativa"
-    waydroid status 2>/dev/null | grep -v "^$" | sed 's/^/  /'
+    waydroid status 2>/dev/null | sed '/^$/d; s/^/  /' || true
 else
     fail "Inativa"
 fi

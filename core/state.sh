@@ -11,7 +11,7 @@
 
 get_state() {
     local _status
-    _status=$(waydroid status 2>/dev/null)
+    _status="$(waydroid status 2>/dev/null || true)"
 
     if ! echo "$_status" | grep -q "Container:.*RUNNING"; then
         echo "STOPPED"
@@ -23,7 +23,7 @@ get_state() {
         return
     fi
 
-    if waydroid shell pidof "$APP_PACKAGE" &>/dev/null 2>&1; then
+    if declare -F waydroid_shell &>/dev/null && waydroid_shell pidof "$APP_PACKAGE" &>/dev/null; then
         echo "APP_RUNNING"
         return
     fi

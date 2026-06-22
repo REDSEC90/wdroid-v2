@@ -25,6 +25,12 @@ assert_eq() {
     else fail "$desc" "esperado='$expected' obtido='$actual'"; fi
 }
 
+assert_not_eq() {
+    local desc="$1" unexpected="$2" actual="$3"
+    if [ "$unexpected" != "$actual" ]; then pass "$desc"
+    else fail "$desc" "não esperado='$unexpected' obtido='$actual'"; fi
+}
+
 assert_contains() {
     local desc="$1" needle="$2" haystack="$3"
     if echo "$haystack" | grep -qF "$needle"; then pass "$desc"
@@ -49,6 +55,12 @@ assert_file_exists() {
     else fail "$desc" "arquivo não encontrado: $file"; fi
 }
 
+assert_file_absent() {
+    local desc="$1" file="$2"
+    if [ ! -e "$file" ]; then pass "$desc"
+    else fail "$desc" "não deveria existir: $file"; fi
+}
+
 assert_executable() {
     local desc="$1" file="$2"
     if [ -x "$file" ]; then pass "$desc"
@@ -59,7 +71,11 @@ assert_executable() {
 for _test_file in "$BASE_DIR/tests"/test_*.sh; do
     [ -f "$_test_file" ] || continue
     # shellcheck source=/dev/null
-    source "$_test_file" || true
+    source "$_test_file"
+    _test_rc=$?
+    if [ "$_test_rc" -ne 0 ]; then
+        fail "arquivo de teste carregou sem erro: ${_test_file#$BASE_DIR/}" "status=$_test_rc"
+    fi
 done
 
 # ── Relatório final ───────────────────────────────────────────────────────────
