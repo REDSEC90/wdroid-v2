@@ -51,9 +51,12 @@ _check() {
     fi
 }
 
-_cmd_waydroid() { command -v waydroid; }
+_cmd_waydroid()  { command -v waydroid; }
 _cmd_systemctl() { command -v systemctl; }
-_cmd_iptables() { command -v iptables; }
+_cmd_iptables()  {
+    command -v iptables || command -v iptables-legacy || \
+    command -v nft || [ -x /sbin/nft ] || [ -x /usr/sbin/nft ]
+}
 _fix_start_container() { sudo systemctl start "$WAYDROID_CONTAINER"; }
 _fix_ip_forward() { sudo sysctl -w net.ipv4.ip_forward=1; }
 _check_waydroid_data_dir() { [ -d "$WAYDROID_DATA_DIR" ]; }
