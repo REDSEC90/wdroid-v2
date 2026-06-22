@@ -76,16 +76,13 @@ _check "Container rodando"           is_container_running _fix_start_container
 _check "Sessão Android ativa"        is_session_running
 
 section "Rede"
-_check "Interface $WAYDROID_IFACE"   check_network        fix_network
-_check "IP forwarding"               check_ip_forward     _fix_ip_forward
-_check "Rota padrão no container"    check_default_route
-
-# Network Subsystem checks (SDD-002)
-if declare -F network_is_online &>/dev/null; then
-    _check "Internet acessível"      network_is_online
-    _check "DNS funcional"           dns_is_healthy
-    _check "Gateway acessível"       route_validate_default
-fi
+_check "Interface $WAYDROID_IFACE"        check_network          fix_network
+_check "IP forwarding"                    check_ip_forward       _fix_ip_forward
+_check "IP do container configurado"      check_container_ip     fix_network
+_check "Rota padrão no container"         check_default_route    fix_network
+_check "Gateway acessível"               route_validate_default  fix_network
+_check "Internet acessível"              network_is_online       fix_network
+_check "DNS funcional"                   dns_is_healthy          fix_network
 
 section "Armazenamento"
 _check "Diretório Waydroid"          _check_waydroid_data_dir
